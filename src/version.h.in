@@ -1,2 +1,2 @@
 #pragma once
-#define VERSION "@git_tag@ ( @git_revision@ )"
+#define VERSION "@GIT_TAG@ ( @GIT_REVISION@ )"

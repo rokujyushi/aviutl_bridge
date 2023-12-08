@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.20)
 project(aviutl_bridge C)
 
-find_program(CLANG_FORMAT_EXE clang-format)
-file(GLOB sources "${PROJECT_SOURCE_DIR}/src/*.c" "${PROJECT_SOURCE_DIR}/src/*.h")
-add_custom_target(${PROJECT_NAME}-format ALL
-  COMMAND ${CLANG_FORMAT_EXE} -style=file -i ${sources}
-)
+if(FORMAT_SOURCES)
+  file(GLOB_RECURSE sources LIST_DIRECTORIES false CONFIGURE_DEPENDS "src/*.h" "src/*.c")
+  list(FILTER sources EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}/3rd")
+  find_program(CLANG_FORMAT_EXE clang-format)
+  add_custom_target(${PROJECT_NAME}-format ALL
+    COMMAND ${CLANG_FORMAT_EXE} -style=file -i ${sources}
+  )
+endif()
 
 add_subdirectory(src)

@@ -2,51 +2,91 @@ find_package(Git REQUIRED)
 execute_process(
   COMMAND ${GIT_EXECUTABLE} tag --points-at HEAD
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  OUTPUT_VARIABLE git_tag
+  OUTPUT_VARIABLE GIT_TAG
   ERROR_QUIET
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-if ("${git_tag}" STREQUAL "")
-  set(git_tag "vX.X.X")
+if ("${GIT_TAG}" STREQUAL "")
+  set(GIT_TAG "vX.X.X")
 endif()
-
 execute_process(
   COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  OUTPUT_VARIABLE git_revision
+  OUTPUT_VARIABLE GIT_REVISION
   ERROR_QUIET
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-if ("${git_revision}" STREQUAL "")
-  set(git_revision "unknown")
+if ("${GIT_REVISION}" STREQUAL "")
+  set(GIT_REVISION "unknown")
 endif()
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in" "${CMAKE_CURRENT_BINARY_DIR}/version.h" @ONLY NEWLINE_STYLE LF)
+configure_file("${PROJECT_SOURCE_DIR}/README.md" "${PROJECT_BINARY_DIR}/bin/bridge.txt" @ONLY NEWLINE_STYLE CRLF)
 
-add_custom_target(generate_version_h COMMAND ${CMAKE_COMMAND}
-  -Dinput_file="${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
-  -Doutput_file="${CMAKE_CURRENT_BINARY_DIR}/version.h"
-  -Dnewline="LF"
-  -Dgit_tag="${git_tag}"
-  -Dgit_revision="${git_revision}"
-  -P "${CMAKE_CURRENT_SOURCE_DIR}/replace.cmake"
+add_library(bridge_intf INTERFACE)
+target_compile_definitions(bridge_intf INTERFACE
+  _WIN32_WINNT=0x0601
+  _WINDOWS
+  $<$<CONFIG:Release>:NDEBUG>
 )
-add_custom_target(generate_readme COMMAND ${CMAKE_COMMAND}
-  -Dinput_file="${PROJECT_SOURCE_DIR}/README.md"
-  -Doutput_file="${PROJECT_BINARY_DIR}/bin/bridge.txt"
-  -Dnewline="CRLF"
-  -Dgit_tag="${git_tag}"
-  -Dgit_revision="${git_revision}"
-  -P "${CMAKE_CURRENT_SOURCE_DIR}/replace.cmake"
+target_compile_options(bridge_intf INTERFACE
+  -mstackrealign
+  -Wall
+  -Wextra
+  -Werror
+  -Weverything
+  -Wshadow
+  -Werror=return-type
+  -pedantic-errors
+  -Wno-declaration-after-statement
+  -Wno-unsafe-buffer-usage
+  -ffunction-sections
+  -fdata-sections
+  $<$<CONFIG:Debug>:-O0>
+  $<$<CONFIG:Release>:-O2>
+  -flto
 )
+target_link_options(bridge_intf INTERFACE
+  -Wl,--gc-sections
+  # -Wl,--print-gc-sections
+  -Wl,--kill-at
+  $<$<CONFIG:Release>:-s>
+)
+
+add_library(hashmap STATIC
+  3rd/hashmap.c/hashmap.c
+)
+target_include_directories(hashmap INTERFACE
+  3rd/hashmap.c
+)
+target_link_libraries(hashmap PRIVATE
+  bridge_intf
+)
+target_compile_options(hashmap PRIVATE
+  -Wno-padded
+  -Wno-cast-align
+  -Wno-extra-semi-stmt
+  -Wno-implicit-fallthrough
+  -Wno-sign-conversion
+)
+
+add_library(tinycthread STATIC
+  3rd/tinycthread/source/tinycthread.c
+)
+target_include_directories(tinycthread INTERFACE
+  3rd/tinycthread/source
+)
+target_link_libraries(tinycthread PRIVATE
+  bridge_intf
+)
+target_compile_options(tinycthread PRIVATE
+  -Wno-reserved-macro-identifier
+  -Wno-reserved-identifier
+  -Wno-padded
+  -Wno-missing-variable-declarations
+  -Wno-atomic-implicit-seq-cst
+)
+
 find_program(LUA51DLL lua51.dll CMAKE_FIND_ROOT_PATH_BOTH)
-add_custom_target(generate_importlib COMMAND
-  ${CMAKE_COMMAND}
-  -Dlocal_dir="${CMAKE_CURRENT_BINARY_DIR}"
-  -Ddll="${LUA51DLL}"
-  -Ddef="${CMAKE_CURRENT_BINARY_DIR}/lua51.def"
-  -Dlib="${CMAKE_CURRENT_BINARY_DIR}/liblua51.a"
-  -P "${CMAKE_CURRENT_SOURCE_DIR}/makelib-llvm.cmake"
-)
-
 add_library(bridge_dll SHARED)
 set_target_properties(bridge_dll PROPERTIES
   OUTPUT_NAME "bridge.dll"
@@ -61,49 +101,14 @@ target_sources(bridge_dll PRIVATE
   ods.c
 )
 target_link_libraries(bridge_dll PRIVATE
-  lua51
+  bridge_intf
+  hashmap
+  tinycthread
+  ${LUA51DLL}
 )
 target_include_directories(bridge_dll PRIVATE
   "${CMAKE_CURRENT_BINARY_DIR}" # for version.h
 )
-target_link_directories(bridge_dll PRIVATE
-  "${CMAKE_CURRENT_BINARY_DIR}" # for liblua51.a
+target_compile_options(bridge_dll PRIVATE
+  -Wno-cast-qual
 )
-add_dependencies(bridge_dll generate_version_h generate_importlib generate_readme)
-set(targets bridge_dll)
-
-foreach(target ${targets})
-  target_compile_definitions(${target} PRIVATE
-    _WIN32_WINNT=0x0601
-    _WINDOWS
-    $<$<CONFIG:Release>:NDEBUG>
-  )
-  target_compile_options(${target} PRIVATE
-    --rtlib=compiler-rt
-    -mstackrealign
-    -Wall
-    -Wextra
-    -Werror
-    -Weverything
-    -Wshadow
-    -Werror=return-type
-    -pedantic-errors
-    -Wno-declaration-after-statement
-    -ffunction-sections
-    -fdata-sections
-    $<$<CONFIG:Debug>:-O0>
-    $<$<CONFIG:Release>:-O2>
-    -flto
-  )
-  target_link_options(${target} PRIVATE
-    -fuse-ld=lld
-    -Wl,-delayload,lua51.dll
-    -Wl,--gc-sections
-    # -Wl,--print-gc-sections
-    --rtlib=compiler-rt
-    -no-pthread
-    -static
-    -Wl,--kill-at
-    $<$<CONFIG:Release>:-s>
-  )
-endforeach(target)

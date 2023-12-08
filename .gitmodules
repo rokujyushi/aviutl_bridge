@@ -1,0 +1,6 @@
+[submodule "src/3rd/tinycthread"]
+	path = src/3rd/tinycthread
+	url = https://github.com/oov/tinycthread
+[submodule "src/3rd/hashmap.c"]
+	path = src/3rd/hashmap.c
+	url = https://github.com/oov/hashmap.c/

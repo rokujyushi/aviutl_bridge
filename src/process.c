@@ -88,13 +88,10 @@ static void *queue_pop(struct queue *const q) {
   return r;
 }
 
-#if 0
-static void *queue_pop_nowait(struct queue *const q)
-{
+static void *queue_pop_nowait(struct queue *const q) {
   void *r = NULL;
   mtx_lock(&q->mtx);
-  if (q->used > 0)
-  {
+  if (q->used > 0) {
     r = q->items[q->readcur];
     q->items[q->readcur] = NULL;
     --q->used;
@@ -104,7 +101,6 @@ static void *queue_pop_nowait(struct queue *const q)
   mtx_unlock(&q->mtx);
   return r;
 }
-#endif
 
 struct queue_item {
   void *buf;
@@ -236,7 +232,7 @@ static int read_worker(void *userdata) {
     queue_push(self->q, qi);
   }
 
-error : {
+error: {
   struct queue_item *qi = malloc(sizeof(struct queue_item));
   qi->buf = NULL;
   qi->len = -1;
@@ -469,20 +465,9 @@ void process_finish(struct process *const self) {
     self->process = INVALID_HANDLE_VALUE;
   }
 
-  // FIXME: we cannot use thrd_join on DLL_PROCESS_DETACH bacause hangs.
-  // thrd_join(self->thread, NULL);
-  // struct queue_item *qi = NULL;
-  // while ((qi = queue_pop_nowait(self->q)))
-  // {
-  //   free(qi);
-  // }
-  thrd_detach(self->thread);
+  thrd_join(self->thread, NULL);
   struct queue_item *qi = NULL;
-  while ((qi = queue_pop(self->q))) {
-    if (qi->buf == NULL && qi->len == -1) {
-      free(qi);
-      break;
-    }
+  while ((qi = queue_pop_nowait(self->q))) {
     free(qi);
   }
 

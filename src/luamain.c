@@ -7,19 +7,6 @@
 
 static bool initialized = false;
 
-static inline void *deconst(void const *const ptr) {
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  if __has_warning("-Wcast-qual")
-#    pragma GCC diagnostic ignored "-Wcast-qual"
-#  endif
-  return (void *)ptr;
-#  pragma GCC diagnostic pop
-#else
-  return (void *)ptr;
-#endif // __GNUC__
-}
-
 static int lua_bridge_call_error(lua_State *L, int err) {
   switch (err) {
   case ECALL_OK:
@@ -82,7 +69,7 @@ static int lua_bridge_call(lua_State *L) {
       struct call_mem m;
       m.mode = mode;
       if (mode & MEM_MODE_DIRECT) {
-        m.buf = deconst(lua_topointer(L, 4));
+        m.buf = lua_touserdata(L, 4);
         m.width = lua_tointeger(L, 5);
         m.height = lua_tointeger(L, 6);
         if (!m.buf || m.width == 0 || m.height == 0) {
@@ -98,7 +85,7 @@ static int lua_bridge_call(lua_State *L) {
         lua_pop(L, 2);
         lua_getfield(L, -1, "getpixeldata");
         lua_call(L, 0, 3);
-        m.buf = deconst(lua_topointer(L, -3));
+        m.buf = lua_touserdata(L, -3);
         m.width = lua_tointeger(L, -2);
         m.height = lua_tointeger(L, -1);
         lua_pop(L, 2);
@@ -164,38 +151,55 @@ static int lua_bridge_calc_hash(lua_State *L) {
   return 1;
 }
 
+static int finalize(lua_State *L) {
+  (void)L;
+  if (initialized) {
+    if (!bridge_exit()) {
+      OutputDebugString("failed to free bridge.dll");
+    }
+  }
+  return 0;
+}
+
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L);
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L) {
-  static const struct luaL_Reg fntable[] = {
+  static char const name[] = "bridge";
+  static char const meta_name[] = "bridge_meta";
+  static struct luaL_Reg const funcs[] = {
       {"call", lua_bridge_call},
       {"calc_hash", lua_bridge_calc_hash},
       {NULL, NULL},
   };
-  luaL_register(L, "bridge", fntable);
+  luaL_newmetatable(L, meta_name);
+  lua_pushstring(L, "__index");
+  lua_newtable(L);
+  luaL_register(L, NULL, funcs);
+  lua_settable(L, -3);
+  lua_pushstring(L, "__gc");
+  lua_pushcfunction(L, finalize);
+  lua_settable(L, -3);
+  lua_pop(L, 1);
+
+  struct userdata *ud = lua_newuserdata(L, sizeof(intptr_t));
+  if (!ud) {
+    return luaL_error(L, "lua_newuserdata failed");
+  }
+  lua_pushvalue(L, -1);
+  luaL_getmetatable(L, meta_name);
+  lua_setmetatable(L, -2);
+  lua_setglobal(L, name);
+  lua_getglobal(L, "package");
+  lua_getfield(L, -1, "loaded");
+  lua_pushvalue(L, -3);
+  lua_setfield(L, -2, name);
+  lua_pop(L, 2);
   return 1;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
   (void)hinstDLL;
+  (void)fdwReason;
   (void)lpvReserved;
-  switch (fdwReason) {
-  case DLL_PROCESS_ATTACH:
-    break;
-
-  case DLL_PROCESS_DETACH:
-    if (initialized) {
-      if (!bridge_exit()) {
-        OutputDebugString("failed to free bridge.dll");
-      }
-    }
-    break;
-
-  case DLL_THREAD_ATTACH:
-    break;
-
-  case DLL_THREAD_DETACH:
-    break;
-  }
   return TRUE;
 }
