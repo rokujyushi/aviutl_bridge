@@ -25,6 +25,21 @@ static int lua_bridge_call_error(lua_State *L, int err) {
   return luaL_error(L, "unexpected error code");
 }
 
+struct recvdata {
+  struct call_mem *mem;
+  lua_State *L;
+};
+
+static void receive_text(void *userdata, void const *const ptr, size_t const len) {
+  struct recvdata *const rd = (struct recvdata *)userdata;
+  if (rd->mem && rd->mem->mode & MEM_MODE_WRITE && !(rd->mem->mode & MEM_MODE_DIRECT)) {
+    lua_getfield(rd->L, -2, "putpixeldata");
+    lua_pushvalue(rd->L, -2);
+    lua_call(rd->L, 1, 0);
+  }
+  lua_pushlstring(rd->L, ptr, len);
+}
+
 static int lua_bridge_call(lua_State *L) {
   if (!initialized) {
     lua_getglobal(L, "obj");
@@ -90,29 +105,34 @@ static int lua_bridge_call(lua_State *L) {
         m.height = lua_tointeger(L, -1);
         lua_pop(L, 2);
       }
-      int32_t rlen = 0;
-      void *r = NULL;
-      const int err = bridge_call(exe_path, buf, (int32_t)buflen, &m, &r, &rlen);
+      const int err = bridge_call(exe_path,
+                                  buf,
+                                  (int32_t)buflen,
+                                  &m,
+                                  receive_text,
+                                  &(struct recvdata){
+                                      .mem = &m,
+                                      .L = L,
+                                  });
       if (err != ECALL_OK) {
         return lua_bridge_call_error(L, err);
       }
-      if (m.mode & MEM_MODE_WRITE && !(m.mode & MEM_MODE_DIRECT)) {
-        lua_getfield(L, -2, "putpixeldata");
-        lua_pushvalue(L, -2);
-        lua_call(L, 1, 0);
-      }
-      lua_pushlstring(L, r, (size_t)rlen);
       return 1;
     }
   }
 
-  int32_t rlen = 0;
-  void *r = NULL;
-  int const err = bridge_call(exe_path, buf, (int32_t)buflen, NULL, &r, &rlen);
+  int const err = bridge_call(exe_path,
+                              buf,
+                              (int32_t)buflen,
+                              NULL,
+                              receive_text,
+                              &(struct recvdata){
+                                  .mem = NULL,
+                                  .L = L,
+                              });
   if (err != ECALL_OK) {
     return lua_bridge_call_error(L, err);
   }
-  lua_pushlstring(L, r, (size_t)rlen);
   return 1;
 }
 

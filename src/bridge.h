@@ -39,6 +39,6 @@ int bridge_call(char const *const exe_path,
                 void const *const buf,
                 int32_t const len,
                 struct call_mem *const mem,
-                void **const r,
-                int32_t *const rlen);
+                void (*recv)(void *userdata, void const *const r, size_t const rlen),
+                void *userdata);
 bool bridge_exit(void);
