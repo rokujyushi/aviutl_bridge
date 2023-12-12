@@ -183,6 +183,11 @@ static int finalize(lua_State *L) {
 
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L);
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L) {
+  struct userdata *ud = lua_newuserdata(L, sizeof(intptr_t));
+  if (!ud) {
+    return luaL_error(L, "lua_newuserdata failed");
+  }
+
   static char const name[] = "bridge";
   static char const meta_name[] = "bridge_meta";
   static struct luaL_Reg const funcs[] = {
@@ -198,15 +203,9 @@ EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L) {
   lua_pushstring(L, "__gc");
   lua_pushcfunction(L, finalize);
   lua_settable(L, -3);
-  lua_pop(L, 1);
-
-  struct userdata *ud = lua_newuserdata(L, sizeof(intptr_t));
-  if (!ud) {
-    return luaL_error(L, "lua_newuserdata failed");
-  }
-  lua_pushvalue(L, -1);
-  luaL_getmetatable(L, meta_name);
   lua_setmetatable(L, -2);
+
+  lua_pushvalue(L, -1);
   lua_setglobal(L, name);
   lua_getglobal(L, "package");
   lua_getfield(L, -1, "loaded");
