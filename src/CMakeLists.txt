@@ -79,7 +79,6 @@ foreach(target ${targets})
     $<$<CONFIG:Release>:NDEBUG>
   )
   target_compile_options(${target} PRIVATE
-    --rtlib=compiler-rt
     -mstackrealign
     -Wall
     -Wextra
@@ -100,7 +99,6 @@ foreach(target ${targets})
     -Wl,-delayload,lua51.dll
     -Wl,--gc-sections
     # -Wl,--print-gc-sections
-    --rtlib=compiler-rt
     -no-pthread
     -static
     -Wl,--kill-at
