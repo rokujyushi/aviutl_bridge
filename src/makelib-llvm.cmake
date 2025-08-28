@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.5)
 
 find_program(GENDEF gendef REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
 find_program(DLLTOOL llvm-dlltool REQUIRED CMAKE_FIND_ROOT_PATH_BOTH)
