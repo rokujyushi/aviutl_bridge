@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(aviutl_bridge)
 
-add_compile_options(-Wno-unsafe-buffer-usage -Wno-padded)
+add_compile_options(-Wno-everything)
 
 # 以降、ターゲットやソースファイルの指定など
 find_program(CLANG_FORMAT_EXE clang-format)
