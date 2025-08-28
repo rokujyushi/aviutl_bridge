@@ -16,6 +16,8 @@ jobs:
         include:
           - msystem: MINGW32
             arch: i686
+          - msystem: MINGW64
+            arch: x86_64
     steps:
       - uses: actions/checkout@v2
         with:
@@ -35,15 +37,23 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          mkdir build
-          cd build
-          rm -rf CMakeCache.txt && cmake -GNinja -DCMAKE_C_COMPILER=clang -DCMAKE_C_STANDARD=11 -DCMAKE_C_STANDARD_REQUIRED=ON -DCMAKE_C_EXTENSIONS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release .. && cmake --build .
+            mkdir -p build
+            cd build
+            rm -f CMakeCache.txt
+            cmake -GNinja \
+              -DCMAKE_C_COMPILER=clang \
+              -DCMAKE_C_STANDARD=11 \
+              -DCMAKE_C_STANDARD_REQUIRED=ON \
+              -DCMAKE_C_EXTENSIONS=OFF \
+              -DCMAKE_BUILD_TYPE=Release \
+              ..
+            ninja
       - name: Upload binaries
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.msystem }}-bin
-          path: |
-            build/bin/**/*
+          path: build/bin/**/*
+
   create-release:
     needs: [build]
     runs-on: ubuntu-latest
@@ -55,7 +65,11 @@ jobs:
         uses: actions/download-artifact@v2
       - name: Zip
         run: |
-          cd MINGW32-bin && zip -r aviutl_bridge_${{ steps.get_version.outputs.tag }}.zip * && cd ..
+          TAG=${{ steps.get_version.outputs.tag }}
+          for d in MINGW*-bin; do
+            [ -d "$d" ] || continue
+            zip -r aviutl_bridge_${TAG}_${d}.zip "$d"
+          done
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -68,19 +82,22 @@ jobs:
           prerelease: false
           body: |
             ### ダウンロード
-            
-            - [aviutl_bridge_${{ steps.get_version.outputs.tag }}.zip](https://github.com/oov/aviutl_bridge/releases/download/${{ steps.get_version.outputs.tag }}/aviutl_bridge_${{ steps.get_version.outputs.tag }}.zip)
-            
+            - 32bit/64bit 個別 zip を参照してください。
             ### 変更点
-            
             - ＊＊＊＊
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
+      - name: Upload Release Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./MINGW32-bin/aviutl_bridge_${{ steps.get_version.outputs.tag }}.zip
-          asset_name: aviutl_bridge_${{ steps.get_version.outputs.tag }}.zip
-          asset_content_type: application/zip
+        run: |
+          set -e
+          UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
+          for f in aviutl_bridge_${{ steps.get_version.outputs.tag }}_MINGW*-bin.zip; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            echo "Uploading $name"
+            curl -sS \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/zip" \
+              --data-binary @"$f" \
+              "${UPLOAD_URL}?name=${name}"
+          done
