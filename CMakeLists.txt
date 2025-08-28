@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.10)
 project(aviutl_bridge C)
 
 find_program(CLANG_FORMAT_EXE clang-format)
