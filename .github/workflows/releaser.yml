@@ -39,6 +39,8 @@ jobs:
             mingw-w64-x86_64-lua51
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-tools
+            mingw-w64-x86_64-llvm
+
           update: true
 
       - name: Build
