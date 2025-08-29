@@ -1,5 +1,5 @@
-#include <lua5.1/lauxlib.h>
-#include <lua5.1/lua.h>
+#include <lauxlib.h>
+#include <lua.h>
 #include <windows.h>
 
 #include "bridge.h"
@@ -21,8 +21,9 @@ static int lua_bridge_call_error(lua_State *L, int err) {
     return luaL_error(L, "could not send command to child process");
   case ECALL_FAILED_TO_RECEIVE_COMMAND:
     return luaL_error(L, "could not receive reply from child process");
+  default:
+    return luaL_error(L, "unexpected error code");
   }
-  return luaL_error(L, "unexpected error code");
 }
 
 struct recvdata {
@@ -37,7 +38,7 @@ static void receive_text(void *userdata, void const *const ptr, size_t const len
     lua_pushvalue(rd->L, -2);
     lua_call(rd->L, 1, 0);
   }
-  lua_pushlstring(rd->L, ptr, len);
+  lua_pushlstring(rd->L, (const char *)ptr, len);
 }
 
 static int lua_bridge_call(lua_State *L) {
@@ -77,6 +78,8 @@ static int lua_bridge_call(lua_State *L) {
       case 'p':
       case 'P':
         mode |= MEM_MODE_DIRECT;
+        break;
+      default:
         break;
       }
     }
@@ -166,7 +169,7 @@ static int lua_bridge_calc_hash(lua_State *L) {
     return luaL_error(L, "invalid arguments");
   }
   char b[16];
-  to_hex(b, cyrb64(p, (size_t)(w * h), 0x3fc0b49e));
+  to_hex(b, cyrb64((const uint32_t *)p, (size_t)(w * h), 0x3fc0b49e));
   lua_pushlstring(L, b, 16);
   return 1;
 }
@@ -183,7 +186,7 @@ static int finalize(lua_State *L) {
 
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L);
 EXTERN_C int __declspec(dllexport) luaopen_bridge(lua_State *L) {
-  struct userdata *ud = lua_newuserdata(L, sizeof(intptr_t));
+  struct userdata *ud = (struct userdata *)lua_newuserdata(L, sizeof(intptr_t));
   if (!ud) {
     return luaL_error(L, "lua_newuserdata failed");
   }

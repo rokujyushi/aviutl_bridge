@@ -21,7 +21,7 @@ struct process {
   HANDLE err_r;
 };
 
-static wchar_t *build_environment_strings(wchar_t const *const name, wchar_t const *const value) {
+static WCHAR *build_environment_strings(WCHAR const *const name, WCHAR const *const value) {
   LPWCH envstr = GetEnvironmentStringsW();
   if (!envstr) {
     return NULL;
@@ -37,12 +37,11 @@ static wchar_t *build_environment_strings(wchar_t const *const name, wchar_t con
     src += l;
   }
 
-  wchar_t *newenv = calloc((size_t)(len + 1), sizeof(WCHAR));
+  WCHAR *const newenv = (WCHAR *)calloc((size_t)(len + 1), sizeof(WCHAR));
+  WCHAR *dest = newenv;
   if (!newenv) {
     goto cleanup;
   }
-
-  wchar_t *dest = newenv;
   wcscpy(dest, name);
   dest += name_len;
   *dest++ = L'=';
@@ -51,7 +50,7 @@ static wchar_t *build_environment_strings(wchar_t const *const name, wchar_t con
   dest += value_len + 1;
   len -= value_len + 1;
 
-  memcpy(dest, envstr, (size_t)(len) * sizeof(wchar_t));
+  memcpy(dest, envstr, (size_t)(len) * sizeof(WCHAR));
   FreeEnvironmentStringsW(envstr);
   return newenv;
 cleanup:
@@ -62,7 +61,7 @@ cleanup:
 
 static WCHAR *get_working_directory(const WCHAR *exe_path) {
   int exe_pathlen = lstrlenW(exe_path) + 1;
-  WCHAR *path = calloc((size_t)exe_pathlen, sizeof(WCHAR));
+  WCHAR *path = (WCHAR *)calloc((size_t)exe_pathlen, sizeof(WCHAR));
   if (!path) {
     return NULL;
   }
@@ -82,7 +81,7 @@ static WCHAR *get_working_directory(const WCHAR *exe_path) {
     free(path);
     return NULL;
   }
-  WCHAR *dir = calloc((size_t)dirlen, sizeof(WCHAR));
+  WCHAR *dir = (WCHAR *)calloc((size_t)dirlen, sizeof(WCHAR));
   WCHAR *fn = NULL;
   if (GetFullPathNameW(path, (DWORD)dirlen, dir, &fn) == 0 || fn == NULL) {
     free(dir);
@@ -95,7 +94,7 @@ static WCHAR *get_working_directory(const WCHAR *exe_path) {
 }
 
 static BOOL read(HANDLE h, void *buf, DWORD sz) {
-  char *b = buf;
+  char *b = (char *)buf;
   for (DWORD read; sz > 0; b += read, sz -= read) {
     if (!ReadFile(h, b, sz, &read, NULL)) {
       return FALSE;
@@ -105,7 +104,7 @@ static BOOL read(HANDLE h, void *buf, DWORD sz) {
 }
 
 static BOOL write(HANDLE h, const void *buf, DWORD sz) {
-  const char *b = buf;
+  const char *b = (const char *)buf;
   for (DWORD written; sz > 0; b += written, sz -= written) {
     if (!WriteFile(h, b, sz, &written, NULL)) {
       return FALSE;
@@ -115,7 +114,7 @@ static BOOL write(HANDLE h, const void *buf, DWORD sz) {
 }
 
 static int read_worker(void *userdata) {
-  struct process *self = userdata;
+  struct process *const self = (struct process *)userdata;
   void *buf1 = NULL;
   void *buf2 = NULL;
   size_t buf1_len = 0;
@@ -192,7 +191,7 @@ int process_read(struct process *const self,
 }
 
 struct process *
-process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, wchar_t const *const envvar_value) {
+process_start(WCHAR const *const exe_path, WCHAR const *const envvar_name, WCHAR const *const envvar_value) {
   HANDLE in_r = INVALID_HANDLE_VALUE;
   HANDLE in_w = INVALID_HANDLE_VALUE;
   HANDLE in_w_tmp = INVALID_HANDLE_VALUE;
@@ -205,7 +204,18 @@ process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, w
   HANDLE err_w = INVALID_HANDLE_VALUE;
   HANDLE err_r_tmp = INVALID_HANDLE_VALUE;
 
-  wchar_t *env = NULL, *path = NULL, *dir = NULL;
+  WCHAR *env = NULL, *path = NULL, *dir = NULL;
+  struct process *r = NULL;
+
+  HANDLE curproc = GetCurrentProcess();
+  PROCESS_INFORMATION pi = {INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, 0};
+  STARTUPINFOW si = {
+      .cb = sizeof(STARTUPINFOW),
+      .dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW,
+      .wShowWindow = SW_HIDE,
+  };
+
+  int const pathlen = lstrlenW(exe_path) + 1;
 
   SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), 0, TRUE};
   if (!CreatePipe(&in_r, &in_w_tmp, &sa, 0)) {
@@ -218,7 +228,6 @@ process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, w
     goto cleanup;
   }
 
-  HANDLE curproc = GetCurrentProcess();
   if (!DuplicateHandle(curproc, in_w_tmp, curproc, &in_w, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
     goto cleanup;
   }
@@ -242,8 +251,7 @@ process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, w
   }
 
   // have to copy this buffer because CreateProcessW may modify path string.
-  int pathlen = lstrlenW(exe_path) + 1;
-  path = calloc((size_t)pathlen, sizeof(WCHAR));
+  path = (WCHAR *)calloc((size_t)pathlen, sizeof(WCHAR));
   if (!path) {
     goto cleanup;
   }
@@ -254,11 +262,6 @@ process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, w
     goto cleanup;
   }
 
-  PROCESS_INFORMATION pi = {INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, 0};
-  STARTUPINFOW si = {0};
-  si.cb = sizeof(STARTUPINFOW);
-  si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-  si.wShowWindow = SW_HIDE;
   si.hStdInput = in_r;
   si.hStdOutput = out_w;
   si.hStdError = err_w;
@@ -280,7 +283,7 @@ process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, w
   CloseHandle(out_w);
   out_w = INVALID_HANDLE_VALUE;
 
-  struct process *r = calloc(1, sizeof(struct process));
+  r = (struct process *)calloc(1, sizeof(struct process));
   if (!r) {
     CloseHandle(pi.hProcess);
     pi.hProcess = INVALID_HANDLE_VALUE;

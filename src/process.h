@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <wchar.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -8,7 +9,7 @@
 struct process;
 
 struct process *
-process_start(wchar_t const *const exe_path, wchar_t const *const envvar_name, wchar_t const *const envvar_value);
+process_start(WCHAR const *const exe_path, WCHAR const *const envvar_name, WCHAR const *const envvar_value);
 void process_finish(struct process *const self);
 void process_close_stderr(struct process *const self);
 int process_read(struct process *const self,

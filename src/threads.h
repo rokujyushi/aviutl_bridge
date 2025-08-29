@@ -8,6 +8,9 @@
 #  if __has_warning("-Wreserved-identifier")
 #    pragma GCC diagnostic ignored "-Wreserved-identifier"
 #  endif
+#  if __has_warning("-Wpre-c11-compat")
+#    pragma GCC diagnostic ignored "-Wpre-c11-compat"
+#  endif
 #endif // __GNUC__
 #include <tinycthread.h>
 #ifdef __GNUC__

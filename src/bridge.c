@@ -31,14 +31,14 @@ static void my_free(void *ptr, void *udata) {
 }
 
 static uint64_t hash(void const *const item, uint64_t const seed0, uint64_t const seed1, void *const udata) {
-  struct item const *const v = item;
+  struct item const *const v = (struct item const *)item;
   (void)udata;
   return hashmap_sip(v->key, v->key_len, seed0, seed1);
 }
 
 static int compare(void const *const a, void const *const b, void *const udata) {
-  struct item const *const va = a;
-  struct item const *const vb = b;
+  struct item const *const va = (struct item const *)a;
+  struct item const *const vb = (struct item const *)b;
   (void)udata;
   int const r = memcmp(va->key, vb->key, va->key_len < vb->key_len ? va->key_len : vb->key_len);
   if (r != 0) {
@@ -90,7 +90,7 @@ bool bridge_init(int32_t const max_width, int32_t const max_height) {
   g_mapped_file = mapped_file;
   g_view = view;
   g_bufsize = header_size + body_size;
-  struct share_mem_header *const v = view;
+  struct share_mem_header *const v = (struct share_mem_header *)view;
   v->header_size = header_size;
   v->body_size = (uint32_t)body_size;
   v->version = 1;
@@ -105,7 +105,7 @@ bool bridge_exit(void) {
   size_t iter = 0;
   void *item;
   while (hashmap_iter(g_process_map, &iter, &item)) {
-    struct item *v = item;
+    struct item *v = (struct item *)item;
     process_finish(v->value);
     free(v->key);
   }
@@ -130,9 +130,9 @@ struct recvdata {
 };
 
 static void call_recv(void *userdata, void const *const ptr, size_t const len) {
-  struct recvdata *const rd = userdata;
+  struct recvdata *const rd = (struct recvdata *const)userdata;
   if (rd->mem && rd->mem->mode & MEM_MODE_WRITE) {
-    struct share_mem_header *v = g_view;
+    struct share_mem_header *const v = (struct share_mem_header *)g_view;
     memcpy(rd->mem->buf, v + 1, (size_t)(rd->mem->width * 4 * rd->mem->height));
   }
   rd->recv(rd->userdata, ptr, len);
@@ -163,12 +163,12 @@ static int bridge_call_core(char const *const exe_path,
     }
   }
   if (!hmv) {
-    char *newkey = malloc(hmkey.key_len);
+    char *newkey = (char *)malloc(hmkey.key_len);
     if (!newkey) {
       return ECALL_MEMORY_ALLOCATION_FAILED;
     }
     int buflen = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, hmkey.key, (int)hmkey.key_len, NULL, 0);
-    WCHAR *wpath = malloc(sizeof(WCHAR) * (size_t)(buflen + 1));
+    WCHAR *wpath = (WCHAR *)malloc(sizeof(WCHAR) * (size_t)(buflen + 1));
     if (!wpath) {
       free(newkey);
       return ECALL_FAILED_TO_CONVERT_EXE_PATH;
@@ -203,7 +203,7 @@ static int bridge_call_core(char const *const exe_path,
     hmv = (struct item *)(hashmap_get_with_hash(g_process_map, &hmkey, hash));
   }
   if (mem) {
-    struct share_mem_header *v = g_view;
+    struct share_mem_header *const v = (struct share_mem_header *)g_view;
     v->width = (uint32_t)mem->width;
     v->height = (uint32_t)mem->height;
     if (mem->mode & MEM_MODE_READ) {
