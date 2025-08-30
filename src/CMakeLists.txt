@@ -23,14 +23,27 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in" "${CMAKE_CURRENT_BINAR
 configure_file("${PROJECT_SOURCE_DIR}/README.md" "${PROJECT_BINARY_DIR}/bin/bridge.txt" @ONLY NEWLINE_STYLE CRLF)
 
 include(FetchContent)
-set(LUA_URL "https://github.com/oov/lua-5.1.5/releases/download/v5.1.5/lua_v5.1.5_i686.zip")
-FetchContent_Populate(
-  lua
-  URL ${LUA_URL}
-)
-set(LUA_DLL_NAME "lua51.dll")
-set(LUA_DLL "${lua_SOURCE_DIR}/bin/${LUA_DLL_NAME}")
-set(LUA_INCLUDE "${lua_SOURCE_DIR}/include")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(LUA_URL "https://github.com/oov/luajit/releases/download/v2.1.20250708-a2/luajit_v2.1.20250708-a2_x86_64.zip")
+  FetchContent_Populate(
+    lua
+    URL ${LUA_URL}
+  )
+  set(LUA_DLL_NAME "luaJIT.dll")
+  set(LUA_DLL "${lua_SOURCE_DIR}/bin/${LUA_DLL_NAME}")
+  set(LUA_INCLUDE "${lua_SOURCE_DIR}/include")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set(LUA_URL "https://github.com/oov/lua-5.1.5/releases/download/v5.1.5/lua_v5.1.5_i686.zip")
+  FetchContent_Populate(
+    lua
+    URL ${LUA_URL}
+  )
+  set(LUA_DLL_NAME "lua51.dll")
+  set(LUA_DLL "${lua_SOURCE_DIR}/bin/${LUA_DLL_NAME}")
+  set(LUA_INCLUDE "${lua_SOURCE_DIR}/include")
+else()
+  message(FATAL_ERROR "failed to detect environment")
+endif()
 
 add_library(bridge_intf INTERFACE)
 target_compile_definitions(bridge_intf INTERFACE

@@ -174,8 +174,13 @@ local hash = require("bridge").calc_hash(obj.getpixeldata());
 
 ## バイナリのビルドについて
 
-bridge.dll は [MSYS2](https://www.msys2.org/) + CLANG32 上で開発しています。  
-ビルド方法や必要になるパッケージなどは [GitHub Actions の設定ファイル](https://github.com/oov/aviutl_bridge/blob/main/.github/workflows/releaser.yml) を参考にしてください。
+bridge.dll は Bash + llvm-mingw の環境で開発しています。  
+Windows 上の Git Bash や Ubuntu 上の Bash で以下のコマンドで打つと、ビルドに必要な一式が準備されてファイルが生成されます。
+
+```bash
+$ bash -x build.bash --arch i686   # 32bit版
+$ bash -x build.bash --arch x86_64 # 64bit版（※AviUtl ExEdit2 には obj.getpixeldata/obj.putpixeldata がないので動きません）
+```
 
 ## Credits
 

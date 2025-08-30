@@ -7,6 +7,14 @@
 
 static bool initialized = false;
 
+static int32_t safe_lua_toint32(lua_State *L, int idx, const char *name) {
+  lua_Integer val = lua_tointeger(L, idx);
+  if (val < 0 || val > INT32_MAX) {
+    return luaL_error(L, "%s value out of range (0 to %d): %lld", name, INT32_MAX, (long long)val);
+  }
+  return (int32_t)val;
+}
+
 static int lua_bridge_call_error(lua_State *L, int err) {
   switch (err) {
   case ECALL_OK:
@@ -47,7 +55,7 @@ static int lua_bridge_call(lua_State *L) {
     lua_getfield(L, -1, "getinfo");
     lua_pushstring(L, "image_max");
     lua_call(L, 1, 2);
-    if (!bridge_init(lua_tointeger(L, -2), lua_tointeger(L, -1))) {
+    if (!bridge_init(safe_lua_toint32(L, -2, "max_width"), safe_lua_toint32(L, -1, "max_height"))) {
       return luaL_error(L, "failed to initialize bridge.dll");
     }
     lua_pop(L, 2);
@@ -88,8 +96,8 @@ static int lua_bridge_call(lua_State *L) {
       m.mode = mode;
       if (mode & MEM_MODE_DIRECT) {
         m.buf = lua_touserdata(L, 4);
-        m.width = lua_tointeger(L, 5);
-        m.height = lua_tointeger(L, 6);
+        m.width = safe_lua_toint32(L, 5, "width");
+        m.height = safe_lua_toint32(L, 6, "height");
         if (!m.buf || m.width == 0 || m.height == 0) {
           return luaL_error(L, "invalid arguments");
         }
@@ -104,8 +112,8 @@ static int lua_bridge_call(lua_State *L) {
         lua_getfield(L, -1, "getpixeldata");
         lua_call(L, 0, 3);
         m.buf = lua_touserdata(L, -3);
-        m.width = lua_tointeger(L, -2);
-        m.height = lua_tointeger(L, -1);
+        m.width = safe_lua_toint32(L, -2, "width");
+        m.height = safe_lua_toint32(L, -1, "height");
         lua_pop(L, 2);
       }
       const int err = bridge_call(exe_path,
@@ -160,8 +168,8 @@ static inline void to_hex(char *const dst, uint64_t x) {
 
 static int lua_bridge_calc_hash(lua_State *L) {
   void const *const p = lua_topointer(L, 1);
-  int const w = lua_tointeger(L, 2);
-  int const h = lua_tointeger(L, 3);
+  int32_t const w = safe_lua_toint32(L, 2, "width");
+  int32_t const h = safe_lua_toint32(L, 3, "height");
   if (!p) {
     return luaL_error(L, "has no image");
   }

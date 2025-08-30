@@ -27,12 +27,19 @@ enum mem_mode {
   MEM_MODE_DIRECT = 4,
 };
 
+#ifdef __clang__
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wpadded"
+#endif
 struct call_mem {
   void *buf;
   int32_t mode;
   int32_t width;
   int32_t height;
 };
+#ifdef __clang__
+#  pragma clang diagnostic pop
+#endif
 
 bool bridge_init(int32_t const max_width, int32_t const max_height);
 int bridge_call(char const *const exe_path,

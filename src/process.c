@@ -103,12 +103,16 @@ static BOOL read(HANDLE h, void *buf, DWORD sz) {
   return TRUE;
 }
 
-static BOOL write(HANDLE h, const void *buf, DWORD sz) {
+static BOOL write(HANDLE h, const void *buf, size_t sz) {
   const char *b = (const char *)buf;
-  for (DWORD written; sz > 0; b += written, sz -= written) {
-    if (!WriteFile(h, b, sz, &written, NULL)) {
+  while (sz > 0) {
+    DWORD chunk = (DWORD)(sz > MAXDWORD ? MAXDWORD : sz);
+    DWORD written;
+    if (!WriteFile(h, b, chunk, &written, NULL)) {
       return FALSE;
     }
+    b += written;
+    sz -= written;
   }
   return TRUE;
 }
