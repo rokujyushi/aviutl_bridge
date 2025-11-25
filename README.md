@@ -172,6 +172,14 @@ int main(){
 local hash = require("bridge").calc_hash(obj.getpixeldata());
 ```
 
+## 詳細なドキュメント
+
+共有メモリアクセスや外部プログラムの実装方法についての詳細なドキュメントは [docs/](docs/) ディレクトリを参照してください。
+
+- **[docs/shared_memory.md](docs/shared_memory.md)**: 共有メモリアクセスに関する技術ドキュメント
+- **[docs/examples.md](docs/examples.md)**: 外部プログラムの実装例集
+- **[docs/README.md](docs/README.md)**: ドキュメントの索引とクイックスタートガイド
+
 ## バイナリのビルドについて
 
 bridge.dll は Bash + llvm-mingw の環境で開発しています。  
